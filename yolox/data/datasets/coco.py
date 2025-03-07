@@ -59,6 +59,7 @@ class COCODataset(CacheDataset):
             data_dir = os.path.join(get_yolox_datadir(), "COCO")
         self.data_dir = data_dir
         self.json_file = json_file
+        self.add_weather_augmentations=True
 
         self.coco = COCO(os.path.join(self.data_dir, "annotations", self.json_file))
         remove_useless_info(self.coco)
