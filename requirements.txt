@@ -18,4 +18,4 @@ albucore==0.0.13
 pycocotools>=2.0.2
 onnx>=1.13.0
 onnxruntime #for inference
-#onnx-simplifier==0.4.10
+onnxsim
