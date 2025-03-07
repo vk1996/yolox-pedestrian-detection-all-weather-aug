@@ -1,4 +1,7 @@
 .zip
 .jpg
 .png
+.pth
+.ipynb
 datasets
+YOLOX_outputs
