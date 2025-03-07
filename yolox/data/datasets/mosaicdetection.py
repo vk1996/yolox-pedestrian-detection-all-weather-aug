@@ -108,8 +108,9 @@ class MosaicDetection(Dataset):
                 (h, w, c) = img.shape[:3]
 
                 ### add weather aug here before mosaic aug ###
-                img = self.weather_transform(image=img)['image']
-                cv2.imwrite('weather_aug.jpg', img)
+                if random.choice([True, False]):
+                    img = self.weather_transform(image=img)['image']
+                    cv2.imwrite('weather_aug.jpg', img)
                 ### add weather aug here before mosaic aug ###
 
                 # generate output mosaic image
@@ -173,8 +174,9 @@ class MosaicDetection(Dataset):
             self._dataset._input_dim = self.input_dim
             img, label, img_info, img_id = self._dataset.pull_item(idx)
             ### add weather aug here before prepoc ###
-            img = self.weather_transform(image=img)['image']
-            cv2.imwrite('weather_aug.jpg',img)
+            if random.choice([True, False]):
+                img = self.weather_transform(image=img)['image']
+                cv2.imwrite('weather_aug.jpg', img)
             ### add weather aug here before prepoc ###
             img, label = self.preproc(img, label, self.input_dim)
             return img, label, img_info, img_id
