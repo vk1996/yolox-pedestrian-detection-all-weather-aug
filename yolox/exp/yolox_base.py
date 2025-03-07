@@ -38,7 +38,7 @@ class Exp(BaseExp):
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
         # dir of dataset images, if data_dir is None, this project will use `datasets` dir
-        self.data_dir = "dataset"
+        self.data_dir = "datasets"
         # name of annotation file for training
         self.train_ann = "train.json"
         # name of annotation file for evaluation
@@ -304,7 +304,7 @@ class Exp(BaseExp):
         return COCODataset(
             data_dir=self.data_dir,
             json_file=self.val_ann if not testdev else self.test_ann,
-            name="val2017" if not testdev else "test2017",
+            name="val" if not testdev else "test",
             img_size=self.test_size,
             preproc=ValTransform(legacy=legacy),
         )
