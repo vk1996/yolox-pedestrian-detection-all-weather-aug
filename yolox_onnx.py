@@ -1,4 +1,5 @@
 import cv2
+from time import time
 import numpy as np
 import onnxruntime
 from matplotlib import pyplot as plt
@@ -11,6 +12,8 @@ class YOLOX_ONNX:
         providers = ['CPUExecutionProvider']
         self.model = onnxruntime.InferenceSession(model_path, providers=providers)
         self.image_size = self.model.get_inputs()[0].shape[-2:]
+        # print(self.model.get_outputs()[0].name)
+        # print(self.image_size)
         self.labels_map=['pedestrian']
 
 
@@ -48,29 +51,9 @@ class YOLOX_ONNX:
             ovr = inter / (areas[i] + areas[order[1:]] - inter)
             inds = np.where(ovr <= iou_thresh)[0]
             order = order[inds + 1]
+
         return keep
-    
-    @staticmethod
-    def __remove_duplicates(coordinates, scores, classes):
-        duplicates = defaultdict(list)
-        for i, item in enumerate(classes):
-            duplicates[item].append(i)
-    
-        duplicate_indexes = {k: v for k, v in duplicates.items() if len(v) > 1}
-        if len(duplicate_indexes) > 0:
-            indexes_to_remove = []
-            for value in duplicate_indexes.values():
-                highest_score_index = -1
-                score = -1
-                for index in value:
-                    if scores[index] > score:
-                        score = scores[index]
-                        highest_score_index = index
-                indexes_to_remove.append([index for index in value if index != highest_score_index])
-            coordinates = np.delete(coordinates, indexes_to_remove, 0)
-            scores = np.delete(scores, indexes_to_remove)
-            classes = np.delete(classes, indexes_to_remove)
-        return coordinates, scores, classes
+
 
     def __parse_output_data(self, outputs):
         grids = []
@@ -97,12 +80,14 @@ class YOLOX_ONNX:
         scores = np.amax(classes, axis=1)
         classes = np.argmax(classes, axis=1)
 
+
         valid_score_mask = scores > score_thresh
         if valid_score_mask.sum() == 0:
             return np.array([]), np.array([]), np.array([])
         valid_scores = scores[valid_score_mask]
         valid_boxes = boxes[valid_score_mask]
         valid_classes = classes[valid_score_mask]
+
 
         valid_boxes_xyxy = np.ones_like(valid_boxes)
         valid_boxes_xyxy[:, 0] = valid_boxes[:, 0] - valid_boxes[:, 2]/2.
@@ -116,7 +101,7 @@ class YOLOX_ONNX:
         valid_scores = valid_scores[indices]
         valid_classes = valid_classes[indices].astype('int')
         
-        valid_boxes_xyxy, valid_scores, valid_classes = self.__remove_duplicates(valid_boxes_xyxy, valid_scores, valid_classes)
+        #valid_boxes_xyxy, valid_scores, valid_classes = self.__remove_duplicates(valid_boxes_xyxy, valid_scores, valid_classes)
 
 
         return valid_boxes_xyxy, valid_scores, valid_classes
@@ -129,47 +114,52 @@ class YOLOX_ONNX:
                         (int(boxes[i,0]), int(boxes[i,1])), 
                         (int(boxes[i,2]), int(boxes[i,3])),
                         (0, 128, 0),
-                        2)
-            xmin,ymin,xmax,ymax=int(boxes[i,0]), int(boxes[i,1]),int(boxes[i,2]), int(boxes[i,3])
+                        int(0.005*img.shape[1]))
 
-            
-            text_label = ''
-            if labels is not None:
-                if classes is not None:
-                    text_label = labels[classes[i]]
-                if scores is not None:
-                    text_label+= ' ' + str("%.2f" % round(scores[i],2))
-            elif scores is not None:
-                text_label = str("%.2f" % round(scores[i],2))
-            w, h = cv2.getTextSize(text_label, 0, fontScale=0.5, thickness=1)[0]
-            cv2.putText(img,
-                        text_label,
-                        (int(boxes[i,0]) if int(boxes[i,0])+w<img.shape[1] else img.shape[1]-w, int(boxes[i,1])-2 if (int(boxes[i,1])-h>=3) else int(boxes[i,1])+h+2),
-                        0,
-                        0.5,
-                        (0,0,255),
-                        thickness=1,
-                        lineType=cv2.LINE_AA)
+            ### not drawing classes since num_classes is 1(pedestrian) and text not greatly visible in gradio UI
+            # text_label = ''
+            # if labels is not None:
+            #     if classes is not None:
+            #         text_label = labels[classes[i]]
+            #     if scores is not None:
+            #         text_label+= ' ' + str("%.2f" % round(scores[i],2))
+            # elif scores is not None:
+            #     text_label = str("%.2f" % round(scores[i],2))
+
+            #w, h = cv2.getTextSize(text_label, 0, fontScale=0.5, thickness=1)[0]
+            # cv2.putText(img,
+            #             text_label,
+            #             (int(boxes[i,0]) if int(boxes[i,0])+w<img.shape[1] else img.shape[1]-w, int(boxes[i,1])-2 if (int(boxes[i,1])-h>=3) else int(boxes[i,1])+h+2),
+            #             0,
+            #             0.5,
+            #             (0,0,255),
+            #             thickness= int(0.005*img.shape[1]),
+            #             lineType=cv2.LINE_AA)
         return img
 
-    def predict(self, image, score_thresh=0.25, iou_thresh=0.25):
+    def predict(self, image, score_thresh=0.5, iou_thresh=0.5):
         h,w = image.shape[:2]
         origin_img=np.copy(image)
         model_input = np.copy(image)
         model_input, resize_ratio = self.__preprocess_image(model_input)
-
+        #print(model_input.shape)
+        #print('input mean:', np.mean(model_input))
+        start_time=time()
         prediction = self.model.run(None, {self.model.get_inputs()[0].name: model_input[None, :, :, :]})
+        #print(self.model.get_inputs()[0].name)
+        #print('output mean:',np.mean(prediction))
         prediction = self.__parse_output_data(prediction[0])
 
         d_boxes, d_scores, d_classes=self.__decode_prediction(prediction, (h,w), resize_ratio, score_thresh, iou_thresh)
         self.output_img = self.draw_boxes(origin_img, d_boxes,None, d_classes, self.labels_map)
+        print('elapsed time:',time()-start_time)
                 
         return d_boxes, d_scores, d_classes
 
-
-path='test.jpg'
-yolox_nano_onnx=YOLOX_ONNX('YOLOX_outputs/yolox_nano/pedestrian-detection.onnx')
-yolox_nano_onnx.predict(cv2.imread(path))
-plt.title('Predicted')
-plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
-plt.show()
+if __name__=="__main__":
+    path='test1.jpg'
+    yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best50.onnx')
+    yolox_nano_onnx.predict(cv2.imread(path))
+    plt.title('Predicted')
+    plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
+    plt.show()
