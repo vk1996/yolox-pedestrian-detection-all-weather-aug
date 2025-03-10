@@ -3,7 +3,6 @@ from time import time
 import numpy as np
 import onnxruntime
 from matplotlib import pyplot as plt
-from collections import defaultdict
 
 
 class YOLOX_ONNX:
@@ -157,7 +156,7 @@ class YOLOX_ONNX:
         return d_boxes, d_scores, d_classes
 
 if __name__=="__main__":
-    path='test1.jpg'
+    path='test-images/test1.jpg'
     yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best95.onnx')
     yolox_nano_onnx.predict(cv2.imread(path))
     plt.title('Predicted')
