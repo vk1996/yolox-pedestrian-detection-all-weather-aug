@@ -3,6 +3,10 @@
 .png
 .pth
 .ipynb
-cpp
+assets
+tools/weather-augmentations.ipynb
+tools/weather.png
+cpp/onnxruntime-linux-x64-1.20.1
+tools
 datasets
 YOLOX_outputs
