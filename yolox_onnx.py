@@ -148,7 +148,7 @@ class YOLOX_ONNX:
         start_time=time()
         prediction = self.model.run(None, {self.model.get_inputs()[0].name: model_input[None, :, :, :]})
         #print(self.model.get_inputs()[0].name)
-        #print('output mean:',np.mean(prediction))
+        #print('output shape:',prediction[0].shape)
         prediction = self.__parse_output_data(prediction[0])
         d_boxes, d_scores, d_classes=self.__decode_prediction(prediction, (h,w), resize_ratio, score_thresh, iou_thresh)
         self.output_img = self.draw_boxes(origin_img, d_boxes,None, d_classes, self.labels_map)
@@ -157,8 +157,8 @@ class YOLOX_ONNX:
         return d_boxes, d_scores, d_classes
 
 if __name__=="__main__":
-    path='test3.jpg'
-    yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best55.onnx')
+    path='test1.jpg'
+    yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best95.onnx')
     yolox_nano_onnx.predict(cv2.imread(path))
     plt.title('Predicted')
     plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))

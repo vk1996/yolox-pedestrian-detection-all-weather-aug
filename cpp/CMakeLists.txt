@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(yolox-onnx)
+project(yolox_onnx)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -14,7 +14,7 @@ include_directories(${ONNXRUNTIME_DIR}/include)
 link_directories(${ONNXRUNTIME_DIR}/lib)
 
 # Create executable
-add_executable(yolox-onnx yolox-onnx.cpp)
+add_executable(yolox_onnx yolox_onnx.cpp)
 
 # Link OpenCV and ONNX Runtime
-target_link_libraries(yolox-onnx ${OpenCV_LIBS} onnxruntime)
+target_link_libraries(yolox_onnx ${OpenCV_LIBS} onnxruntime)

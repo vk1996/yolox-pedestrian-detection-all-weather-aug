@@ -1,18 +1,8 @@
 #include <onnxruntime_cxx_api.h>
 #include <iostream>
-#include <iterator>
-#include <memory>
-#include <opencv2/opencv.hpp>
 #include <numeric>
-#include <stdlib.h>
-#include <string>
-#include <vector>
-#include <cmath>
-#include <chrono>
+#include <opencv2/opencv.hpp>
 
-/**
- * @brief Define names based depends on Unicode path support
- */
 #define NMS_THRESH 0.45
 #define BBOX_CONF_THRESH 0.5
 
@@ -20,17 +10,13 @@ constexpr int INPUT_W = 416;
 constexpr int INPUT_H = 416;
 constexpr int batchSize = 1;
 constexpr int NUM_CLASSES = 1;
-
+constexpr bool SHOW_IMG = true;
 
 template <typename T>
 T vectorProduct(const std::vector<T>& v)
 {
     return std::accumulate(v.begin(), v.end(), 1, std::multiplies<T>());
 }
-
-
-
-
 
 cv::Mat static_resize(cv::Mat &img) {
   float r = std::min(INPUT_W / (img.cols * 1.0), INPUT_H / (img.rows * 1.0));
@@ -42,10 +28,6 @@ cv::Mat static_resize(cv::Mat &img) {
   re.copyTo(out(cv::Rect(0, 0, re.cols, re.rows)));
   return out;
 }
-
-
-
-
 
 struct Object {
   cv::Rect_<float> rect;
@@ -206,12 +188,13 @@ static void decode_outputs(const float *prob, std::vector<Object> &objects,
 
   std::vector<int> picked;
 
-  for (int i=0;i<proposals.size();i++){
+  // for (int i=0;i<proposals.size();i++){
 
-    std::cout << "proposals:"<< proposals[i].prob << std::endl;
+  //   std::cout << "proposals:"<< proposals[i].prob << std::endl;
 
-  }
-  std::cout << "picked:" << picked.size() << std::endl;
+  // }
+  // std::cout << "picked:" << picked.size() << std::endl;
+
   nms_sorted_bboxes(proposals, picked, NMS_THRESH);
   
   int count = picked.size();
@@ -251,8 +234,8 @@ static void draw_objects(const cv::Mat &bgr,
   for (size_t i = 0; i < objects.size(); i++) {
     const Object &obj = objects[i];
 
-    fprintf(stderr, "%d = %.5f at %.2f %.2f %.2f x %.2f\n", obj.label, obj.prob,
-            obj.rect.x, obj.rect.y, obj.rect.width, obj.rect.height);
+    //fprintf(stderr, "%d = %.5f at %.2f %.2f %.2f x %.2f\n", obj.label, obj.prob,
+    //        obj.rect.x, obj.rect.y, obj.rect.width, obj.rect.height);
 
     cv::Scalar color =
         cv::Scalar(color_list[obj.label][0], color_list[obj.label][1],
@@ -295,139 +278,144 @@ static void draw_objects(const cv::Mat &bgr,
   }
 
   cv::imwrite("out.jpg", image);
+
+  if (SHOW_IMG)
+  {
+  cv::namedWindow("Display Image",cv::WINDOW_AUTOSIZE); 
+  cv::imshow("Display Image", image); 
+  cv::waitKey(0); 
+  }
   std::cout << "save output to out.jpg" << std::endl;
 }
 
-
-int main() {
-
-    
-    // Path to ONNX model (Update with actual path)
-    const char* model_path = "/home/vk/personal/yolox-objection-detection/yolox-custom/YOLOX_outputs/yolox_nano/pedestrian-detection-best50.onnx";
-    Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "ONNXRuntimeTest");
-
-    // Create session options
+class YOLOX_ONNX
+{
+public:
+    const char* model_path;
+    Ort::Env env;
     Ort::SessionOptions session_options;
     Ort::AllocatorWithDefaultOptions allocator;
+    Ort::Session session;
 
 
-    Ort::Session session(env, model_path, session_options);
-    std::cout << "ONNX model loaded successfully!" << std::endl;
+    std::vector<const char*> inputNames{"images"};
+    std::vector<const char*> outputNames{"output"};
+    std::vector<int64_t> inputDims = {1,3,416,416};
+    size_t inputTensorSize = vectorProduct(inputDims);
+    std::vector<Ort::Value> inputTensors;
+    std::vector<Ort::Value> outputTensors;
 
-    
 
-    cv::Mat image = cv::imread("test2.jpeg");
-    //cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
+    std::vector<int64_t> outputDims = {1,3549,6};//(batch_size,num_boxes,num_classes+5)
+    size_t outputTensorSize = vectorProduct(outputDims);
+
+    Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+
+    const float* tensor_data;
+
+    YOLOX_ONNX(const char* model_path)
+        : env(ORT_LOGGING_LEVEL_WARNING, "YOLOXONNX"), model_path(model_path), session(env, model_path, session_options)
+    {
+
+        std::cout << "ONNX model loaded successfully from: " << model_path << std::endl;
+    }
+
+
+    void predict(cv::Mat preprocessed_img){
+
+        // Ort::TypeInfo inputTypeInfo = session.GetInputTypeInfo(0);
+        // auto inputTensorInfo = inputTypeInfo.GetTensorTypeAndShapeInfo();
+        // ONNXTensorElementDataType inputType = inputTensorInfo.GetElementType();
+        
+        std::vector<float> inputTensorValues(inputTensorSize);
+        std::cout << "inputTensorSize: " << inputTensorSize << std::endl;
+        // Make copies of the same image input.
+        for (int64_t i = 0; i < batchSize; ++i)
+        {
+            std::copy(preprocessed_img.begin<float>(),
+                    preprocessed_img.end<float>(),
+                    inputTensorValues.begin() + i * inputTensorSize / batchSize);
+        }
+        
+
+
+        //for (long int i : inputDims){
+        //  std::cout << "inputDim" << i << std::endl;
+        //}
+        
+        
+
+        
+        std::vector<float> outputTensorValues(outputTensorSize);
+
+        
+        std::cout << "outputTensorSize: " << outputTensorSize << std::endl;
+
+
+        
+
+        
+        //std::cout << "Here before inference " << std::endl;
+
+
+        
+        inputTensors.push_back(Ort::Value::CreateTensor<float>(
+            memoryInfo, inputTensorValues.data(), inputTensorSize, inputDims.data(),
+            inputDims.size()));
+        outputTensors.push_back(Ort::Value::CreateTensor<float>(
+            memoryInfo, outputTensorValues.data(), outputTensorSize,
+            outputDims.data(), outputDims.size()));
+
+        
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        session.Run(Ort::RunOptions{}, inputNames.data(),
+                        inputTensors.data(), 1, outputNames.data(),
+                        outputTensors.data(), 1);
+        
+        auto stop = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+        
+        std::cout << "Execution Time: " << duration.count() << " ms" << std::endl;
+
+        tensor_data = outputTensors[0].GetTensorData<float>();
+
+
+
+    }
+   
+};
+
+int main(int argc, char** argv) 
+{
+    if (argc != 3) { 
+        std::cout<<"usage: ./yolox-onnx <Model_Path> <Image_Path>"<<std::endl; 
+        return -1; 
+    } 
+
+    const char* img_path = argv[2];
+    const char* model_path = argv[1];
+
+    cv::Mat image = cv::imread(img_path);
     int img_w = image.cols;
     int img_h = image.rows;
     cv::Mat resized_img = static_resize(image);
     cv::Mat preprocessed_img;
     //channnels first
     cv::dnn::blobFromImage(resized_img, preprocessed_img);
-    std::cout << "Input Name: " << preprocessed_img.size << std::endl;
-
-    auto inputNodeName = session.GetInputNameAllocated(0, allocator);
-    const char* inputName = inputNodeName.get();
-    std::cout << "Input Name: " << inputName << std::endl;
-    Ort::TypeInfo inputTypeInfo = session.GetInputTypeInfo(0);
-    auto inputTensorInfo = inputTypeInfo.GetTensorTypeAndShapeInfo();
-    ONNXTensorElementDataType inputType = inputTensorInfo.GetElementType();
-    std::vector<int64_t> inputDims = inputTensorInfo.GetShape();
-    size_t inputTensorSize = vectorProduct(inputDims);
-    std::vector<float> inputTensorValues(inputTensorSize);
-    // Make copies of the same image input.
-    for (int64_t i = 0; i < batchSize; ++i)
-    {
-        std::copy(preprocessed_img.begin<float>(),
-                  preprocessed_img.end<float>(),
-                  inputTensorValues.begin() + i * inputTensorSize / batchSize);
-    }
-
-    //for (long int i : inputDims){
-    //  std::cout << "inputDim" << i << std::endl;
-    //}
-    
-    
-
-    auto outputNodeName = session.GetOutputNameAllocated(0, allocator);
-    const char* outputName = outputNodeName.get();
-    std::cout << "Output Name: " << outputName << std::endl;
-    Ort::TypeInfo outputTypeInfo = session.GetOutputTypeInfo(0);
-    auto outputTensorInfo = outputTypeInfo.GetTensorTypeAndShapeInfo();
-    ONNXTensorElementDataType outputType = outputTensorInfo.GetElementType();
-    std::vector<int64_t> outputDims = outputTensorInfo.GetShape();
-    size_t outputTensorSize = vectorProduct(outputDims);
-    std::vector<float> outputTensorValues(outputTensorSize);
-
-    std::cout << "inputTensorSize: " << inputTensorSize << std::endl;
-
-
-
-
-    std::vector<const char*> inputNames{inputName};
-    std::vector<const char*> outputNames{outputName};
-    std::vector<Ort::Value> inputTensors;
-    std::vector<Ort::Value> outputTensors;
 
     
-    std::cout << "Here before inference " << std::endl;
-
-
-    Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(
-        OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
-    inputTensors.push_back(Ort::Value::CreateTensor<float>(
-        memoryInfo, inputTensorValues.data(), inputTensorSize, inputDims.data(),
-        inputDims.size()));
-    outputTensors.push_back(Ort::Value::CreateTensor<float>(
-        memoryInfo, outputTensorValues.data(), outputTensorSize,
-        outputDims.data(), outputDims.size()));
-
-    
-    const float* tensor_data = inputTensors[0].GetTensorData<float>();
-    int64_t num_elements = 1;
-    for (int64_t dim : inputDims) {
-        num_elements *= dim;
-    }
-    // Compute sum and mean
-    double sum = std::accumulate(tensor_data , tensor_data  + num_elements, 0.0);
-    float mean = sum / num_elements;
-    std::cout<<"input mean:" << mean << std::endl;
-    
-    auto start = std::chrono::high_resolution_clock::now();
-    
-    session.Run(Ort::RunOptions{}, inputNames.data(),
-                    inputTensors.data(), 1, outputNames.data(),
-                    outputTensors.data(), 1);
-
-
-    std::cout << "Here after inference " << std::endl;
-
-    tensor_data = outputTensors[0].GetTensorData<float>();
-    num_elements = 1;
-    for (int64_t dim : outputDims) {
-        num_elements *= dim;
-    }
-    // Compute sum and mean
-    sum = std::accumulate(tensor_data , tensor_data  + num_elements, 0.0);
-    mean = sum / num_elements;
-    std::cout<<"output mean:" << mean << std::endl;
-
-
+    YOLOX_ONNX yolox_onnx(model_path);
+    yolox_onnx.predict(preprocessed_img);
 
     float scale =std::min(INPUT_W / (image.cols * 1.0), INPUT_H / (image.rows * 1.0));
     std::vector<Object> objects;
 
-    decode_outputs(tensor_data, objects, scale, img_w, img_h);
+    decode_outputs(yolox_onnx.tensor_data, objects, scale, img_w, img_h);
 
-
-    //std::cout << "Here after decoding " << std::endl;
     draw_objects(image, objects);
-
-    auto stop = std::chrono::high_resolution_clock::now();
-
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    
-    std::cout << "Execution Time: " << duration.count() << " ms" << std::endl;
-
+ 
     return 0;
 }
