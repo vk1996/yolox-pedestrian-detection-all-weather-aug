@@ -20,6 +20,7 @@ class YOLOX_ONNX:
         
 
     def __preprocess_image(self, img, swap=(2, 0, 1)):
+
         padded_img = np.ones((self.image_size[0], self.image_size[1], 3), dtype=np.uint8) * 114
         r = min(self.image_size[0] / img.shape[0], self.image_size[1] / img.shape[1])
         resized_img = cv2.resize(img, (int(img.shape[1] * r), int(img.shape[0] * r)), interpolation=cv2.INTER_LINEAR).astype(np.uint8)
@@ -137,7 +138,7 @@ class YOLOX_ONNX:
             #             lineType=cv2.LINE_AA)
         return img
 
-    def predict(self, image, score_thresh=0.5, iou_thresh=0.5):
+    def predict(self, image, score_thresh=0.5, iou_thresh=0.4):
         h,w = image.shape[:2]
         origin_img=np.copy(image)
         model_input = np.copy(image)
@@ -149,7 +150,6 @@ class YOLOX_ONNX:
         #print(self.model.get_inputs()[0].name)
         #print('output mean:',np.mean(prediction))
         prediction = self.__parse_output_data(prediction[0])
-
         d_boxes, d_scores, d_classes=self.__decode_prediction(prediction, (h,w), resize_ratio, score_thresh, iou_thresh)
         self.output_img = self.draw_boxes(origin_img, d_boxes,None, d_classes, self.labels_map)
         print('elapsed time:',time()-start_time)
@@ -157,8 +157,8 @@ class YOLOX_ONNX:
         return d_boxes, d_scores, d_classes
 
 if __name__=="__main__":
-    path='test1.jpg'
-    yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best50.onnx')
+    path='test3.jpg'
+    yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best55.onnx')
     yolox_nano_onnx.predict(cv2.imread(path))
     plt.title('Predicted')
     plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
