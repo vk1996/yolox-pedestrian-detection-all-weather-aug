@@ -4,7 +4,7 @@
 
 #### Spaces [demo link](https://huggingface.co/spaces/vk888/yolox-pedestrian-detection-all-weather-augmentation) ####
 
-##### YOLOX Nano model is trained with Roboflow pedestrian dataset and augmentations simulating Snow,Rain,Fog & Sunflare conditions apart from YOLOX mixup aug #####
+##### YOLOX Nano model is trained with Roboflow pedestrian dataset and augmentations simulating Snow,Rain,Fog & Sunflare conditions along with YOLOX mixup aug #####
 
 ### Inference ###
 
