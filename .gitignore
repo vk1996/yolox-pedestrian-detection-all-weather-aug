@@ -3,6 +3,7 @@
 .png
 .pth
 .ipynb
+gradio
 assets
 tools/weather-augmentations.ipynb
 tools/weather.png

@@ -13,7 +13,7 @@
 /**
  * @brief Define names based depends on Unicode path support
  */
-#define NMS_THRESH 0.1
+#define NMS_THRESH 0.45
 #define BBOX_CONF_THRESH 0.5
 
 constexpr int INPUT_W = 416;
