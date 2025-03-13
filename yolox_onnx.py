@@ -14,10 +14,16 @@ class YOLOX_ONNX:
         # print(self.model.get_outputs()[0].name)
         # print(self.image_size)
         self.labels_map=['pedestrian']
-        self.pad_to_square_flag=False
 
     def pad_to_square(self,image):
         height, width = image.shape[:2]
+
+        if (width/height)<1.2:
+            #print('Square Image')
+            self.top, self.bottom = 0,0
+            self.left, self.right = 0,0
+            return image
+
         size = max(height, width)
         delta_w = size - width
         delta_h = size - height
@@ -25,16 +31,13 @@ class YOLOX_ONNX:
         self.left, self.right = delta_w // 2, delta_w - (delta_w // 2)
         print(self.top, self.bottom,self.left, self.right)
         color = [114,114,114]  # padding
-        padded_image = cv2.copyMakeBorder(image, self.top, self.bottom, self.left, self.right, cv2.BORDER_CONSTANT, value=color)
-        return padded_image
+        return cv2.copyMakeBorder(image, self.top, self.bottom, self.left, self.right, cv2.BORDER_CONSTANT, value=color)
 
         
 
     def __preprocess_image(self, img, swap=(2, 0, 1)):
 
-        if (img.shape[1]/img.shape[0]) > 1.2:
-            self.pad_to_square_flag=True
-            img = self.pad_to_square(img)  # training aspect ratio is 1:1
+        img = self.pad_to_square(img)  # training aspect ratio is 1:1
 
         padded_img = np.ones((self.image_size[0], self.image_size[1], 3), dtype=np.uint8) * 114
         r = min(self.image_size[0] / img.shape[0], self.image_size[1] / img.shape[1])
@@ -119,12 +122,9 @@ class YOLOX_ONNX:
         
         #valid_boxes_xyxy, valid_scores, valid_classes = self.__remove_duplicates(valid_boxes_xyxy, valid_scores, valid_classes)
 
-        if self.pad_to_square_flag:
+        for i,offset in enumerate([self.left,self.top,self.right,self.bottom]):
+            valid_boxes_xyxy[:, i] = valid_boxes_xyxy[:,i] - offset #remove pad offsets from boundingbox(xmin,ymin,xmax,ymax)
 
-            for i,offset in enumerate([self.left,self.top,self.right,self.bottom]):
-                valid_boxes_xyxy[:, i] = valid_boxes_xyxy[:,i] - offset #remove pad offsets from boundingbox(xmin,ymin,xmax,ymax)
-
-            self.pad_to_square_flag=False
 
 
         return valid_boxes_xyxy, valid_scores, valid_classes
@@ -181,11 +181,11 @@ class YOLOX_ONNX:
 
 
 
-# if __name__=="__main__":
-#     from matplotlib import pyplot as plt
-#     path='test-images/test1.jpg'
-#     yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best95.onnx')
-#     yolox_nano_onnx.predict(cv2.imread(path))
-#     plt.title('Predicted')
-#     plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
-#     plt.show()
+if __name__=="__main__":
+    from matplotlib import pyplot as plt
+    path='test-images/test1.jpg'
+    yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best95.onnx')
+    yolox_nano_onnx.predict(cv2.imread(path))
+    plt.title('Predicted')
+    plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
+    plt.show()

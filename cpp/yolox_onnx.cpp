@@ -3,31 +3,16 @@
 #include <numeric>
 #include <opencv2/opencv.hpp>
 
-#define NMS_THRESH 0.45
-#define BBOX_CONF_THRESH 0.5
+#define NMS_THRESH 0.4
+#define BBOX_CONF_THRESH 0.4
 
 constexpr int INPUT_W = 416;
 constexpr int INPUT_H = 416;
 constexpr int batchSize = 1;
 constexpr int NUM_CLASSES = 1;
 constexpr bool SHOW_IMG = true;
-
-template <typename T>
-T vectorProduct(const std::vector<T>& v)
-{
-    return std::accumulate(v.begin(), v.end(), 1, std::multiplies<T>());
-}
-
-cv::Mat static_resize(cv::Mat &img) {
-  float r = std::min(INPUT_W / (img.cols * 1.0), INPUT_H / (img.rows * 1.0));
-  int unpad_w = r * img.cols;
-  int unpad_h = r * img.rows;
-  cv::Mat re(unpad_h, unpad_w, CV_8UC3);
-  cv::resize(img, re, re.size());
-  cv::Mat out(INPUT_W, INPUT_H, CV_8UC3, cv::Scalar(114, 114, 114));
-  re.copyTo(out(cv::Rect(0, 0, re.cols, re.rows)));
-  return out;
-}
+constexpr int padding_color =114;
+std::vector <float> pad_vector;
 
 struct Object {
   cv::Rect_<float> rect;
@@ -40,6 +25,59 @@ struct GridAndStride {
   int grid1;
   int stride;
 };
+
+template <typename T>
+T vectorProduct(const std::vector<T>& v)
+{
+    return std::accumulate(v.begin(), v.end(), 1, std::multiplies<T>());
+}
+
+
+
+cv::Mat static_resize(cv::Mat &img) {
+  float r = std::min(INPUT_W / (img.cols * 1.0), INPUT_H / (img.rows * 1.0));
+  int unpad_w = r * img.cols;
+  int unpad_h = r * img.rows;
+  cv::Mat re(unpad_h, unpad_w, CV_8UC3);
+  cv::resize(img, re, re.size());
+  cv::Mat out(INPUT_W, INPUT_H, CV_8UC3, cv::Scalar(114, 114, 114));
+  re.copyTo(out(cv::Rect(0, 0, re.cols, re.rows)));
+  return out;
+}
+
+
+cv::Mat pad_to_square(cv::Mat img,int width,int height){
+
+  if ((img.cols/img.rows)<1.2){
+    std::cout<<"Square Image"<<std::endl;
+    pad_vector={0.,0.,0.,0.};
+    return img;
+  }
+
+  float pad_top,pad_bottom,pad_left,pad_right;
+  
+  int size = std::max(height, width);
+  std::cout<< size << std::endl;
+  int delta_w = size - width;
+  int delta_h = size - height;
+  std::cout<< delta_w << std::endl;
+  std::cout<< delta_h << std::endl;
+
+  pad_top=delta_h / 2;
+  pad_bottom = delta_h - (delta_h / 2);
+  pad_left=delta_w / 2;
+  pad_right = delta_w - (delta_w / 2);
+  pad_vector={pad_left,pad_top,pad_right,pad_bottom};        
+  
+  
+
+  cv::copyMakeBorder(img,img,pad_top,pad_bottom,pad_left,pad_right,cv::BORDER_CONSTANT,padding_color);
+
+  return img;
+
+}
+
+
 
 static void generate_grids_and_stride(const int target_size, std::vector<int> &strides,
                           std::vector<GridAndStride> &grid_strides) {
@@ -176,7 +214,7 @@ static void nms_sorted_bboxes(const std::vector<Object> &faceobjects,
 }
 
 static void decode_outputs(const float *prob, std::vector<Object> &objects,
-                           float scale, const int img_w, const int img_h) {
+                           float scale, const int img_w, const int img_h, std::vector<float> pad_vector) {
   std::vector<Object> proposals;
   std::vector<int> strides = {8, 16, 32};
   std::vector<GridAndStride> grid_strides;
@@ -209,11 +247,12 @@ static void decode_outputs(const float *prob, std::vector<Object> &objects,
     float x1 = (objects[i].rect.x + objects[i].rect.width) / scale;
     float y1 = (objects[i].rect.y + objects[i].rect.height) / scale;
 
-    // clip
-    x0 = std::max(std::min(x0, (float)(img_w - 1)), 0.f);
-    y0 = std::max(std::min(y0, (float)(img_h - 1)), 0.f);
-    x1 = std::max(std::min(x1, (float)(img_w - 1)), 0.f);
-    y1 = std::max(std::min(y1, (float)(img_h - 1)), 0.f);
+    // remove pad offset & clip
+    // pad_left,pad_top,pad_right,pad_bottom
+    x0 = std::max(std::min(x0-pad_vector[0], (float)(img_w - 1)), 0.f);
+    y0 = std::max(std::min(y0-pad_vector[1], (float)(img_h - 1)), 0.f);
+    x1 = std::max(std::min(x1-pad_vector[2], (float)(img_w - 1)), 0.f);
+    y1 = std::max(std::min(y1-pad_vector[3], (float)(img_h - 1)), 0.f);
 
     objects[i].rect.x = x0;
     objects[i].rect.y = y0;
@@ -291,6 +330,8 @@ static void draw_objects(const cv::Mat &bgr,
 class YOLOX_ONNX
 {
 public:
+    
+
     const char* model_path;
     Ort::Env env;
     Ort::SessionOptions session_options;
@@ -398,23 +439,25 @@ int main(int argc, char** argv)
     const char* img_path = argv[2];
     const char* model_path = argv[1];
 
+    YOLOX_ONNX yolox_onnx(model_path);
+
     cv::Mat image = cv::imread(img_path);
+    cv::Mat preprocessed_img;
     int img_w = image.cols;
     int img_h = image.rows;
-    cv::Mat resized_img = static_resize(image);
-    cv::Mat preprocessed_img;
+    preprocessed_img=pad_to_square(image,img_w,img_h);
+    preprocessed_img = static_resize(preprocessed_img);
     //channnels first
-    cv::dnn::blobFromImage(resized_img, preprocessed_img);
+    cv::dnn::blobFromImage(preprocessed_img, preprocessed_img);
 
     
-    YOLOX_ONNX yolox_onnx(model_path);
+    
     yolox_onnx.predict(preprocessed_img);
 
     float scale =std::min(INPUT_W / (image.cols * 1.0), INPUT_H / (image.rows * 1.0));
     std::vector<Object> objects;
 
-    decode_outputs(yolox_onnx.tensor_data, objects, scale, img_w, img_h);
-
+    decode_outputs(yolox_onnx.tensor_data, objects, scale, img_w, img_h,pad_vector);
     draw_objects(image, objects);
  
     return 0;
