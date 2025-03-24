@@ -18,12 +18,14 @@ $make
 $./yolox_onnx ../models/pedestrian-detection-best95.onnx ../test-images/test1.jpg
 ```
 
-#### Python ####
+#### Python ONNX or TensorRT ####
 
 ```commandline
 $pip install -r inference_requirements.txt
 $python yolox_onnx.py
+$python yolox_trt.py
 ```
+
 
 
 ### Training , Evaluation & Export to ONNX ###
