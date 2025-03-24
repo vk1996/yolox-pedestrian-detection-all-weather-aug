@@ -207,6 +207,8 @@ if __name__ == "__main__":
         yolox_trt = YOLOX_TRT('models/pedestrian-detection-best95-trt.engine')
         start_time = time()
         yolox_trt.predict(cv2.imread(path))
+        yolox_trt.d_input.free()
+        yolox_trt.d_output.free()
         print('model loading elapsed time:', (time() - start_time))
         # plt.title('Predicted')
         # plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
