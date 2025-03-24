@@ -8,7 +8,7 @@
 
 ### Inference ###
 
-#### C++ ####
+#### C++ ONNX ####
 
 ```commandline
 $cd cpp
