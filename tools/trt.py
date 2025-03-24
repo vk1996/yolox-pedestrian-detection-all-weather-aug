@@ -6,7 +6,8 @@ import argparse
 import os
 import shutil
 from loguru import logger
-
+import sys
+sys.path.append('/content/torch2trt')
 import tensorrt as trt
 import torch
 from torch2trt import torch2trt
@@ -50,7 +51,7 @@ def main():
     else:
         ckpt_file = args.ckpt
 
-    ckpt = torch.load(ckpt_file, map_location="cpu")
+    ckpt = torch.load(ckpt_file,weights_only=False, map_location="cpu")
     # load the model state dict
 
     model.load_state_dict(ckpt["model"])
@@ -67,14 +68,14 @@ def main():
         max_workspace_size=(1 << args.workspace),
         max_batch_size=args.batch,
     )
-    torch.save(model_trt.state_dict(), os.path.join(file_name, "model_trt.pth"))
+    torch.save(model_trt.state_dict(), "/content/model_trt.pth")
     logger.info("Converted TensorRT model done.")
-    engine_file = os.path.join(file_name, "model_trt.engine")
-    engine_file_demo = os.path.join("demo", "TensorRT", "cpp", "model_trt.engine")
-    with open(engine_file, "wb") as f:
+    #engine_file = os.path.join(file_name, "model_trt.engine")
+    #engine_file_demo = os.path.join("demo", "TensorRT", "cpp", "model_trt.engine")
+    with open('/content/model_trt.engine', "wb") as f:
         f.write(model_trt.engine.serialize())
 
-    shutil.copyfile(engine_file, engine_file_demo)
+    #shutil.copyfile(engine_file, engine_file_demo)
 
     logger.info("Converted TensorRT model engine file is saved for C++ inference.")
 
