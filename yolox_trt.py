@@ -202,12 +202,11 @@ class YOLOX_TRT:
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
-    path = '/content/test2.jpg'
-    yolox_trt = YOLOX_TRT('/content/model_trt.engine')
+    path = 'test-images/test2.jpg'
+    yolox_trt = YOLOX_TRT('models/pedestrian-detection-best95-trt.engine')
     start_time = time()
-    for i in range(1):
-        yolox_trt.predict(cv2.imread(path))
-    print('model loading elapsed time:', (time() - start_time) / 1000)
+    yolox_trt.predict(cv2.imread(path))
+    print('model loading elapsed time:', (time() - start_time))
     # plt.title('Predicted')
     # plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
     # plt.show()
