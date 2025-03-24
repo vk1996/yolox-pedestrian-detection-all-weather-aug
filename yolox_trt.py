@@ -203,11 +203,15 @@ if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
     path = 'test-images/test2.jpg'
-    yolox_trt = YOLOX_TRT('models/pedestrian-detection-best95-trt.engine')
-    start_time = time()
-    yolox_trt.predict(cv2.imread(path))
-    print('model loading elapsed time:', (time() - start_time))
-    # plt.title('Predicted')
-    # plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
-    # plt.show()
-    cv2.imwrite('output.jpg', yolox_trt.output_img)
+    try:
+        yolox_trt = YOLOX_TRT('models/pedestrian-detection-best95-trt.engine')
+        start_time = time()
+        yolox_trt.predict(cv2.imread(path))
+        print('model loading elapsed time:', (time() - start_time))
+        # plt.title('Predicted')
+        # plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
+        # plt.show()
+        cv2.imwrite('output.jpg', yolox_trt.output_img)
+        print('Trt inference completed and output.jpg written ')
+    except Exception as e:
+        print(e)
