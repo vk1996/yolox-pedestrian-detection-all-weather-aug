@@ -3,11 +3,11 @@ from time import time
 import numpy as np
 import tensorrt as trt
 import pycuda.driver as cuda
-import pycuda.autoinit
+
 
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
-
+### keeping this outside the class for error-free cuda mem deallocation ###
 def allocate_buffers(engine):
     h_input = cuda.pagelocked_empty(trt.volume(engine.get_tensor_shape(engine.get_tensor_name(0))),dtype=np.float32)
     h_output = cuda.pagelocked_empty(trt.volume(engine.get_tensor_shape(engine.get_tensor_name(1))),dtype=np.float32)
