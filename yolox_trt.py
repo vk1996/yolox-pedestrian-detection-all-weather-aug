@@ -8,6 +8,16 @@ import pycuda.autoinit
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 
+def allocate_buffers(engine):
+    h_input = cuda.pagelocked_empty(trt.volume(engine.get_tensor_shape(engine.get_tensor_name(0))),dtype=np.float32)
+    h_output = cuda.pagelocked_empty(trt.volume(engine.get_tensor_shape(engine.get_tensor_name(1))),dtype=np.float32)
+    d_input = cuda.mem_alloc(h_input.nbytes)
+    d_output = cuda.mem_alloc(h_output.nbytes)
+    stream = cuda.Stream()
+    return h_input, d_input, h_output, d_output, stream
+
+
+
 class YOLOX_TRT:
 
     def __init__(self, trt_engine_path):
@@ -16,31 +26,11 @@ class YOLOX_TRT:
             self.engine = runtime.deserialize_cuda_engine(f.read())
 
         self.image_size = self.engine.get_tensor_shape(self.engine.get_tensor_name(0))[-2:]
-        self.h_input, self.d_input, self.h_output, self.d_output, self.stream = self.allocate_buffers(self.engine)
+
         # Create an execution context
         self.context = self.engine.create_execution_context()
         self.labels_map = ['pedestrian']
 
-    def allocate_buffers(self, engine):
-        h_input = cuda.pagelocked_empty(trt.volume(self.engine.get_tensor_shape(engine.get_tensor_name(0))),
-                                        dtype=np.float32)
-        h_output = cuda.pagelocked_empty(trt.volume(self.engine.get_tensor_shape(engine.get_tensor_name(1))),
-                                         dtype=np.float32)
-        d_input = cuda.mem_alloc(h_input.nbytes)
-        d_output = cuda.mem_alloc(h_output.nbytes)
-        stream = cuda.Stream()
-        return h_input, d_input, h_output, d_output, stream
-
-    def do_inference(self, context, h_input, d_input, h_output, d_output, stream):
-        # Transfer input to the GPU.
-        cuda.memcpy_htod_async(d_input, h_input, stream)
-        # Run inference.
-        context.execute_v2([int(d_input), int(d_output)])
-        # Transfer predictions back from the GPU.
-        cuda.memcpy_dtoh_async(h_output, d_output, stream)
-        # Synchronize the stream.
-        stream.synchronize()
-        return h_output
 
     def pad_to_square(self, image):
         height, width = image.shape[:2]
@@ -72,6 +62,17 @@ class YOLOX_TRT:
         padded_img = padded_img.transpose(swap)
         padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
         return padded_img, r
+
+    def do_inference(self,h_input, d_input, h_output, d_output, stream):
+        # Transfer input to the GPU.
+        cuda.memcpy_htod_async(d_input, h_input, stream)
+        # Run inference.
+        self.context.execute_v2([int(d_input), int(d_output)])
+        # Transfer predictions back from the GPU.
+        cuda.memcpy_dtoh_async(h_output, d_output, stream)
+        # Synchronize the stream.
+        stream.synchronize()
+        return h_output
 
     @staticmethod
     def __new_nms(boxes, scores, iou_thresh):
@@ -187,8 +188,8 @@ class YOLOX_TRT:
         model_input = np.copy(image)
         model_input, resize_ratio = self.__preprocess_image(model_input)
         # self.h_input[:] = model_input
-        np.copyto(self.h_input, model_input.ravel())
-        output = self.do_inference(self.context, self.h_input, self.d_input, self.h_output, self.d_output, self.stream)#21294
+        np.copyto(h_input, model_input.ravel())
+        output = self.do_inference(h_input,d_input,h_output,d_output,stream)#21294
         output = np.expand_dims(output.reshape((-1,5+len(self.labels_map))), axis=0)#3549,5+num_classes
 
         prediction = self.__parse_output_data(output)
@@ -205,10 +206,12 @@ if __name__ == "__main__":
     path = 'test-images/test2.jpg'
     try:
         yolox_trt = YOLOX_TRT('models/pedestrian-detection-best95-trt.engine')
+        h_input, d_input, h_output, d_output, stream = allocate_buffers(yolox_trt.engine)
         start_time = time()
         yolox_trt.predict(cv2.imread(path))
-        yolox_trt.d_input.free()
-        yolox_trt.d_output.free()
+        yolox_trt.engine=[]
+        d_input.free()
+        d_output.free()
         print('model loading elapsed time:', (time() - start_time))
         # plt.title('Predicted')
         # plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
