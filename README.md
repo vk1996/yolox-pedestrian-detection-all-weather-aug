@@ -1,6 +1,6 @@
 ### YOLOX PEDESTRIAN DETECTION WITH ALL WEATHER AUGMENTATION ###
 ![readme](readme.png)
-
+![output.gif](output.gif)
 
 #### Spaces [demo link](https://huggingface.co/spaces/vk888/yolox-pedestrian-detection-all-weather-augmentation) ####
 
