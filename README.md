@@ -1,4 +1,4 @@
-### YOLOX PEDESTRIAN DETECTION WITH ALL WEATHER AUGMENTATION ###
+### YOLOX pedestrian detection & SORT based tracking with all weather augmentation ###
 ![readme](readme.png)
 ![output.gif](output.gif)
 
