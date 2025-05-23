@@ -20,3 +20,6 @@ onnx>=1.13.0
 onnxruntime #for inference
 onnxsim
 gradio
+
+#for tracking
+filterpy

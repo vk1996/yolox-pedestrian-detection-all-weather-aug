@@ -19,7 +19,7 @@ class Exp(BaseExp):
 
         # ---------------- model config ---------------- #
         # detect classes number of model
-        self.num_classes = 1
+        self.num_classes = 80
         # factor of model depth
         self.depth = 1.00
         # factor of model width

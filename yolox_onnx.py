@@ -11,8 +11,9 @@ class YOLOX_ONNX:
         providers = ['CPUExecutionProvider']
         self.model = onnxruntime.InferenceSession(model_path, providers=providers)
         self.image_size = self.model.get_inputs()[0].shape[-2:]
-        # print(self.model.get_outputs()[0].name)
-        # print(self.image_size)
+        #print(self.model.get_outputs()[0].name)
+        #print('imgsize:',self.image_size)
+        self.enable_pad_to_square=True
         self.labels_map=['pedestrian']
 
     def pad_to_square(self,image):
@@ -29,15 +30,16 @@ class YOLOX_ONNX:
         delta_h = size - height
         self.top, self.bottom = delta_h // 2, delta_h - (delta_h // 2)
         self.left, self.right = delta_w // 2, delta_w - (delta_w // 2)
-        print(self.top, self.bottom,self.left, self.right)
+        #print(self.top, self.bottom,self.left, self.right)
         color = [114,114,114]  # padding
         return cv2.copyMakeBorder(image, self.top, self.bottom, self.left, self.right, cv2.BORDER_CONSTANT, value=color)
 
-        
+
 
     def __preprocess_image(self, img, swap=(2, 0, 1)):
 
-        img = self.pad_to_square(img)  # training aspect ratio is 1:1
+        if self.enable_pad_to_square:
+            img = self.pad_to_square(img)  # training aspect ratio is 1:1
 
         padded_img = np.ones((self.image_size[0], self.image_size[1], 3), dtype=np.uint8) * 114
         r = min(self.image_size[0] / img.shape[0], self.image_size[1] / img.shape[1])
@@ -122,8 +124,10 @@ class YOLOX_ONNX:
         
         #valid_boxes_xyxy, valid_scores, valid_classes = self.__remove_duplicates(valid_boxes_xyxy, valid_scores, valid_classes)
 
-        for i,offset in enumerate([self.left,self.top,self.right,self.bottom]):
-            valid_boxes_xyxy[:, i] = valid_boxes_xyxy[:,i] - offset #remove pad offsets from boundingbox(xmin,ymin,xmax,ymax)
+        if self.enable_pad_to_square:
+
+            for i,offset in enumerate([self.left,self.top,self.right,self.bottom]):
+                valid_boxes_xyxy[:, i] = valid_boxes_xyxy[:,i] - offset #remove pad offsets from boundingbox(xmin,ymin,xmax,ymax)
 
 
 
@@ -160,22 +164,18 @@ class YOLOX_ONNX:
             #             lineType=cv2.LINE_AA)
         return img
 
-    def predict(self, image, score_thresh=0.4, iou_thresh=0.4):
+    def predict(self, image, score_thresh=0.4, iou_thresh=0.5):
 
         h,w = image.shape[:2]
         origin_img=np.copy(image)
         model_input = np.copy(image)
-        model_input, resize_ratio = self.__preprocess_image(model_input)
-        #print(model_input.shape)
-        #print('input mean:', np.mean(model_input))
-        start_time=time()
+        model_input, resize_ratio = self.__preprocess_image(model_input)    
         prediction = self.model.run(None, {self.model.get_inputs()[0].name: model_input[None, :, :, :]})
-        #print(self.model.get_inputs()[0].name)
-        #print('output mean:',np.mean(prediction))
+        #print('mean:',prediction[0][0].mean())
         prediction = self.__parse_output_data(prediction[0])
         d_boxes, d_scores, d_classes=self.__decode_prediction(prediction, (h,w), resize_ratio, score_thresh, iou_thresh)
         self.output_img = self.draw_boxes(origin_img, d_boxes,None, d_classes, self.labels_map)
-        print('elapsed time:',time()-start_time)
+
                 
         return d_boxes, d_scores, d_classes
 
@@ -183,9 +183,14 @@ class YOLOX_ONNX:
 
 if __name__=="__main__":
     from matplotlib import pyplot as plt
-    path='test-images/test1.jpg'
-    yolox_nano_onnx=YOLOX_ONNX('models/pedestrian-detection-best95.onnx')
-    yolox_nano_onnx.predict(cv2.imread(path))
+    #path='test-images/test2.jpg'
+    path='/home/vk/interview/monk/d56819d3-4038fd34.jpg'
+    yolox_nano_onnx=YOLOX_ONNX('models/yolox_nano_pretrained.onnx')
+    start_time = time()
+    for i in range(1):
+        yolox_nano_onnx.predict(cv2.imread(path))
+    print('model loading elapsed time:', (time() - start_time)/1000)
     plt.title('Predicted')
     plt.imshow(cv2.cvtColor(yolox_nano_onnx.output_img,cv2.COLOR_BGR2RGB))
+    cv2.imwrite('/home/vk/interview/monk/output.jpg',yolox_nano_onnx.output_img)
     plt.show()
